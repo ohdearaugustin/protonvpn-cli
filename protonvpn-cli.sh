@@ -8,7 +8,6 @@
 #Author: Mazin Ahmed <Mazin AT ProtonMail DOT ch>
 ######################################################
   #""|"-h"|"--help"|"--h"|"-help"|"help")
-
 if [[ ("$UID" != 0) && ("$1" != "ip") && ("$1" != "-ip") && \
       ("$1" != "--ip") && !( -z "$1") && ("$1" != "-h") && \
       ("$1" != "--help") && ("$1" != "--h") && ("$1" != "-help") && \
@@ -429,34 +428,55 @@ function help_message() {
     echo "$0 -ip                             Print the current public IP address."
     echo "$0 -install                        Install protonvpn-cli."
     echo "$0 -uninstall                      Uninstall protonvn-cli."
+    echo "$0 -debug -command                 Run a command in debug mode."
     echo "$0 -h, --help                      Show help message."
     exit 0
 }
 
+function function_controller() {
+    user_input="$1"
+    user_input2="$2"
+    case $user_input in
+    ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
+      ;;
+    "-d"|"--d"|"-disconnect"|"--disconnect") openvpn_disconnect
+      ;;
+    "-r"|"--r"|"-random"|"--random"|"-random-connect") connect_to_random_vpn
+      ;;
+    "-f"|"--f"|"-fastest"|"--fastest"|"-fastest-connect") connect_to_fastest_vpn
+      ;;
+    "-c"|"--c"|"-connect"|"--connect") connection_to_vpn_via_dialog_menu
+      ;;
+    "ip"|"-ip"|"--ip") check_ip
+      ;;
+    "-init"|"--init") init_cli
+      ;;
+    "-install"|"--install") install_cli
+      ;;
+    "-uninstall"|"--uninstall") uninstall_cli
+      ;;
+    "-debug"|"--debug") debug $user_input2
+      ;;
+    *)
+    echo "[!] Invalid input: $user_input $user_input2"
+    help_message
+      ;;
+    esac
+}
+
+function debug() {
+    debug_command=$1
+    if [[ -z $debug_command ]]; then
+        help_message
+        return
+    fi
+    echo "##########Debugging##########"
+    set -x
+    function_controller $debug_command
+}
+
 check_requirements
 user_input="$1"
-case $user_input in
-  ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
-    ;;
-  "-d"|"--d"|"-disconnect"|"--disconnect") openvpn_disconnect
-    ;;
-  "-r"|"--r"|"-random"|"--random"|"-random-connect") connect_to_random_vpn
-    ;;
-  "-f"|"--f"|"-fastest"|"--fastest"|"-fastest-connect") connect_to_fastest_vpn
-    ;;
-  "-c"|"--c"|"-connect"|"--connect") connection_to_vpn_via_dialog_menu
-    ;;
-  "ip"|"-ip"|"--ip") check_ip
-    ;;
-  "-init"|"--init") init_cli
-    ;;
-  "-install"|"--install") install_cli
-    ;;
-  "-uninstall"|"--uninstall") uninstall_cli
-    ;;
-  *)
-  echo "[!] Invalid input: $user_input"
-  help_message
-    ;;
-esac
+user_input2="$2"
+function_controller $user_input $user_input2
 exit 0

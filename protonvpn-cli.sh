@@ -90,7 +90,7 @@ function init_cli() {
   chown "$USER:$(id -gn $USER)" ~/.protonvpn-cli/protonvpn_tier
   chmod 0400 ~/.protonvpn-cli/protonvpn_tier
 
-  chown "$USER:$(id -gn $USER)" -R ~/.protonvpn-cli/
+  chown -R "$USER:$(id -gn $USER)" ~/.protonvpn-cli/
   chmod -R 0400 ~/.protonvpn-cli/
 
 }
@@ -119,8 +119,8 @@ function modify_dns_resolvconf() {
       dns_server="10.8.0.1" # free tier dns
     else
       dns_server="10.8.8.1" # paid tier dns
-    echo -e "# ProtonVPN DNS - protonvpn-cli\nnameserver $dns_server" > "/etc/resolv.conf"
     fi
+    echo -e "# ProtonVPN DNS - protonvpn-cli\nnameserver $dns_server" > "/etc/resolv.conf"
   fi
 
   if [[ "$1" == "revert_to_backup" ]]; then

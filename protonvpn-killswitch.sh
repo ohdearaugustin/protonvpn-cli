@@ -49,6 +49,7 @@ function help_message() {
 }
 
 check_requirements
+if [[ "${BASH_SOURCE[0]}" = "${0}" ]]; then
 user_input="$1"
 vpn_interface="tun0"
 case $user_input in
@@ -64,3 +65,4 @@ case $user_input in
         ;;
 esac
 exit 0
+fi

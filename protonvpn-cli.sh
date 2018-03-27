@@ -20,7 +20,6 @@ fi
 #Source Killswitch and check if file exists
 source protonvpn-killswitch
 if [[ $? -ne 0 ]]; then
-    echo "Source from different location"
     source protonvpn-killswitch.sh
     if [[ $? -ne 0 ]]; then
         echo "[!] Error: The program needs protonvpn-killswitch or protonvpn-killswitch.sh!"

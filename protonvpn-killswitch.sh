@@ -21,8 +21,25 @@ function check_requirements() {
     fi
 }
 
+function modify_hosts() {
+    if [[ "$1" == "backup_hostsconf" ]]; then
+        cp "/etc/hosts" "/etc/hosts.protonvpn_backup" #backing-up current hosts
+    fi
+
+    if [[ "$1" == "add_api" ]]; then
+        echo -e "ProtonVPN API - protonvpn-killswitch\n185.70.40.185\tapi.protonmail.ch" >> "/etc/hosts"
+    fi
+
+    if [[ "$1" == "revert_to_backup" ]]; then
+        cp "/etc/hosts.protonvpn_backup" "/etc/hosts"
+        rm "/etc/hosts.protonvpn_backup"
+    fi
+}
+
 function enable_firewall() {
     echo "Enable Killswitch"
+    modify_hosts backup_hostsconf
+    modify_hosts add_api
     vpn_interface="$1"
     ufw --force reset
     ufw default deny incoming
@@ -39,6 +56,7 @@ function disable_firewall() {
     ufw default deny incoming
     ufw default allow outgoing
     ufw enable
+    modify_hosts revert_to_backup
 }
 
 function help_message() {

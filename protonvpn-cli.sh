@@ -7,7 +7,8 @@
 ###
 #Author: Mazin Ahmed <Mazin AT ProtonMail DOT ch>
 ######################################################
-  #""|"-h"|"--help"|"--h"|"-help"|"help")
+#""|"-h"|"--help"|"--h"|"-help"|"help")
+
 if [[ ("$UID" != 0) && ("$1" != "ip") && ("$1" != "-ip") && \
       ("$1" != "--ip") && !( -z "$1") && ("$1" != "-h") && \
       ("$1" != "--help") && ("$1" != "--h") && ("$1" != "-help") && \
@@ -15,6 +16,8 @@ if [[ ("$UID" != 0) && ("$1" != "ip") && ("$1" != "-ip") && \
   echo "[!] Error: The program requires root access."
   exit 1
 fi
+
+source protonvpn-killswitch.sh
 
 function check_requirements() {
   if [[ $(which openvpn) == "" ]]; then
@@ -429,13 +432,30 @@ function help_message() {
     echo "$0 -install                        Install protonvpn-cli."
     echo "$0 -uninstall                      Uninstall protonvn-cli."
     echo "$0 -debug -command                 Run a command in debug mode."
+    echo "$0 -killswitch enable/disable      Enables or disables Killswitch."
     echo "$0 -h, --help                      Show help message."
     exit 0
 }
 
+function killswitch() {
+    user_input=$1
+    case $user_input in
+        "e"|"enable")
+            enable_firewall tun0
+            ;;
+        "disable")
+            disable_firewall
+            ;;
+        *)
+        echo "[!] Invalid input: $user_input"
+        help_message
+          ;;
+    esac
+}
+
 function function_controller() {
-    user_input="$1"
-    user_input2="$2"
+    #user_input="$1"
+    #user_input2="$2"
     case $user_input in
     ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
       ;;
@@ -455,7 +475,9 @@ function function_controller() {
       ;;
     "-uninstall"|"--uninstall") uninstall_cli
       ;;
-    "-debug"|"--debug") debug $user_input2
+    "-debug"|"--debug") debug $user_input2 $user_input3
+      ;;
+    "-killswitch"|"--killswitch") killswitch $user_input2
       ;;
     *)
     echo "[!] Invalid input: $user_input $user_input2"
@@ -466,17 +488,19 @@ function function_controller() {
 
 function debug() {
     debug_command=$1
+    debug_command_arg=$2
     if [[ -z $debug_command ]]; then
         help_message
         return
     fi
     echo "##########Debugging##########"
     set -x
-    function_controller $debug_command
+    function_controller $debug_command $debug_command_arg
 }
 
 check_requirements
 user_input="$1"
 user_input2="$2"
-function_controller $user_input $user_input2
+user_input3="$3"
+function_controller
 exit 0

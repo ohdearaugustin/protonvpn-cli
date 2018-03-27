@@ -46,9 +46,8 @@ function enable_firewall() {
     ufw default deny outgoing
     ufw allow out on $vpn_interface from any to any
     #only allow connection to api.protonmail.ch
-    ufw allow out from any to 185.70.40.185 port 443
+    modify_firewall open 185.70.40.185 tcp
     ufw enable
-
 }
 
 function disable_firewall() {
@@ -60,18 +59,30 @@ function disable_firewall() {
     modify_hosts revert_to_backup
 }
 
-function open_firewall_to() {
-    ip=$1
-    proto=$2
+function modify_firewall() {
+    method=$1
+    ip=$2
+    proto=$3
 
-    if [[ $proto == "udp" ]]; then
-        ufw allow out from any to $ip port 1184 porto udp
+    if [[ $method == "open" ]]; then
+        if [[ $proto == "udp" ]]; then
+            ufw allow out from any to $ip port 1194 proto udp
+        fi
+
+        if [[ $proto == "tcp" ]]; then
+            ufw allow out from any to $ip port 443 proto tcp
+        fi
     fi
 
-    if [[ $porto == "tcp" ]]; then
-        ufw allow out from any to $ip port 443 porto tcp
+    if [[ $method == "close" ]]; then
+        if [[ $proto == "udp" ]]; then
+            ufw deny out from any to $ip port 1194 proto udp
+        fi
+
+        if [[ $proto == "tcp" ]]; then
+            ufw deny out from any to $ip port 443 proto tcp
+        fi
     fi
-    ufw reload
 }
 
 function help_message() {

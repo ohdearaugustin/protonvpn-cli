@@ -184,7 +184,8 @@ function openvpn_connect() {
   modify_dns_resolvconf backup_resolvconf # backuping-up current resolv.conf
 
   config_id=$1
-  selected_protocol=$2
+  config_ip=$2
+  selected_protocol=$3
   if [[ $selected_protocol == "" ]]; then
     selected_protocol="udp"  # Default protocol
   fi
@@ -192,6 +193,7 @@ function openvpn_connect() {
   current_ip=$(check_ip)
 
   firewall_api open
+  modify_firewall open $config_ip $selected_protocol
 
   wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
@@ -220,6 +222,7 @@ function openvpn_connect() {
   done
   echo "[!] Error connecting to VPN."
   openvpn_disconnect quiet
+  modify_firewall close $config_ip $selected_protocol
   exit 1
 }
 
@@ -280,10 +283,12 @@ function connect_to_random_vpn() {
   fi
 
   echo "Fetching ProtonVPN Servers..."
-  config_id=$(get_fastest_vpn_connection_id)
+  config=$(get_random_vpn_connection_config)
+  config_id=$(echo "$config" | cut -d " " -f1)
+  config_ip=$(echo "$config" | cut -d " " -f2)
   available_protocols=("tcp" "udp")
   selected_protocol=${available_protocols[$RANDOM % ${#available_protocols[@]}]}
-  openvpn_connect "$config_id" "$selected_protocol"
+  openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
 
 function connection_to_vpn_via_dialog_menu() {
@@ -326,6 +331,7 @@ function connection_to_vpn_via_dialog_menu() {
     if [[ $c -eq $config_id ]]; then
       ID=$(echo "$i" | cut -d " " -f1)
       config_id=$ID
+      config_ip=$(echo "$i" | cut -d " " -f2 | cut -d "@" -f4)
       break
     fi
     c=$((c+1))
@@ -338,9 +344,9 @@ function connection_to_vpn_via_dialog_menu() {
     exit 2
   fi
 
-  openvpn_connect "$config_id" "$selected_protocol"
-
+  openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
+
 function get_fastest_vpn_connection_id() {
   firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
@@ -386,7 +392,7 @@ END`
   echo "$output"
 }
 
-function get_random_vpn_connection_id() {
+function get_random_vpn_connection_config() {
   firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
@@ -398,9 +404,10 @@ import json, random
 json_parsed_response = json.loads("""$response_output""")
 output = []
 for _ in json_parsed_response["LogicalServers"]:
-    if (_["Tier"] <= int("""$tier"""):
+    if (_["Tier"] <= int("""$tier""")):
         output.append(_)
-print(random.choice(output)["Servers"][0]["ID"])
+choice = random.choice(output)["Servers"][0]
+print(choice["ID"] + " " + choice["EntryIP"])
 END`
 
   echo "$output"

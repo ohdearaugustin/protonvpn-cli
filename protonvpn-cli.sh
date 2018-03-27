@@ -445,10 +445,11 @@ function connect_to_specific_server() {
   fi
 
   for i in $server_list; do
-    id=$(echo "$i" | cut -d"@" -f1)
-    name=$(echo "$i" | cut -d"@" -f2)
-    if [[ "${name,,}" == "${1,,}" ]]; then
-      openvpn_connect "$id" "$protocol" #TODO: ServerIP
+    config_id=$(echo "$i" | cut -d"@" -f1)
+    config_name=$(echo "$i" | cut -d"@" -f2)
+    config_ip=$(echo "$i" | cut -d "@" -f5)
+    if [[ "${config_name,,}" == "${1,,}" ]]; then
+      openvpn_connect "$config_id" "$config_ip" "$protocol"
     fi
   done
 

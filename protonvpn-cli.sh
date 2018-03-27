@@ -213,15 +213,18 @@ function openvpn_connect() {
 function install_cli() {
   mkdir -p "/usr/local/bin/"
   cli="$( cd "$(dirname "$0")" ; pwd -P )/$0"
+  killswitch="$( cd "$(dirname "$0")" ; pwd -P)/protonvpn-killswitch.sh"
   cp "$cli" "/usr/local/bin/protonvpn-cli"
+  cp "$killswitch" "/usr/local/bin/protonvpn-killswitch"
+  ln -s -f "/usr/local/bin/protonvpn-killswitch.sh" "/usr/local/bin/proton-killswitch"
   ln -s -f "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn"
-  chown "$USER:$(id -gn $USER)" "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn"
+  chown "$USER:$(id -gn $USER)" "/usr/local/bin/protonvpn-cli" "/usr/local/bin/protonvpn-killswitch" "/usr/local/bin/pvpn"
   chmod 0755 "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn"
   echo "Done."
 }
 
 function uninstall_cli() {
-  rm -f "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn"
+  rm -f "/usr/local/bin/protonvpn-cli" "/usr/local/bin/protonvpn-killswitch" "/usr/local/bin/pvpn"
   rm -rf ~/.protonvpn-cli/
   echo "Done."
 }
@@ -454,8 +457,6 @@ function killswitch() {
 }
 
 function function_controller() {
-    #user_input="$1"
-    #user_input2="$2"
     case $user_input in
     ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
       ;;

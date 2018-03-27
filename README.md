@@ -45,7 +45,7 @@ $ sudo bash -c "git clone https://github.com/ProtonVPN/protonvpn-cli.git ; ./pro
 | `protonvpn-cli -update`          | Update protonvpn-cli.                         |
 | `protonvpn-cli -install`         | Install protonvpn-cli.                        |
 | `protonvpn-cli -uninstall`       | Uninstall protonvpn-cli.                      |
-| `protonvpn-cli -debug -command`  | Debug a the specified command.                      |
+| `protonvpn-cli -debug -command`  | Run a command in debug mode.                      |
 | `protonvpn-cli -help`            | Show help message.                            |
 
 

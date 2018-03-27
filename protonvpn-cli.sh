@@ -215,6 +215,7 @@ function openvpn_connect() {
 
       echo "[$] Connected!"
       echo "[#] New IP: $new_ip"
+      modify_firewall close $config_ip $selected_protocol
       exit 0
     fi
 

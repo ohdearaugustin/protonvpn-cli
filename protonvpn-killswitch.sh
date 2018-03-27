@@ -66,22 +66,34 @@ function modify_firewall() {
 
     if [[ $method == "open" ]]; then
         if [[ $proto == "udp" ]]; then
-            ufw allow out from any to $ip port 1194 proto udp
+            ufw allow out from any to $ip port 1194 proto udp > /dev/null
         fi
 
         if [[ $proto == "tcp" ]]; then
-            ufw allow out from any to $ip port 443 proto tcp
+            ufw allow out from any to $ip port 443 proto tcp > /dev/null
         fi
     fi
 
     if [[ $method == "close" ]]; then
         if [[ $proto == "udp" ]]; then
-            ufw deny out from any to $ip port 1194 proto udp
+            ufw deny out from any to $ip port 1194 proto udp > /dev/null
         fi
 
         if [[ $proto == "tcp" ]]; then
-            ufw deny out from any to $ip port 443 proto tcp
+            ufw deny out from any to $ip port 443 proto tcp > /dev/null
         fi
+    fi
+}
+
+function firewall_api() {
+    api_ip="185.70.40.185"
+    method=$1
+    if [[ $method == "open" ]]; then
+        modify_firewall open $api_ip tcp
+    fi
+
+    if [[ $method == "close" ]]; then
+        modify_firewall close $api_ip tcp
     fi
 }
 

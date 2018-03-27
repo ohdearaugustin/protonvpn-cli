@@ -14,7 +14,7 @@ if [[ "$UID" != 0 ]]; then
     exit 1
 fi
 
-function check_requirements_killswitch() {
+function check_requirements() {
     if [[ $(which ufw) == "" ]]; then
         echo "[!]Error: ufw is not installed. Install \`ufw\` package to continue."
         exit 1
@@ -109,7 +109,7 @@ function help_message() {
     exit 0
 }
 
-check_requirements_killswitch
+check_requirements
 if [[ "${BASH_SOURCE[0]}" = "${0}" ]]; then
 user_input="$1"
 vpn_interface="tun0"

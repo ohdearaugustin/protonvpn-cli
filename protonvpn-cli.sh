@@ -605,6 +605,7 @@ function function_controller() {
     user_input="$1"
     user_input2="$2"
     user_input3="$3"
+    user_input4="$4"
     case $user_input in
     ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
         ;;
@@ -631,7 +632,7 @@ function function_controller() {
         ;;
     "-uninstall"|"--uninstall") uninstall_cli
         ;;
-    "-debug"|"--debug") debug $user_input2
+    "-debug"|"--debug") debug "$user_input2" "$user_input3" "$user_input4"
         ;;
     *)
     echo "[!] Invalid input: $user_input $user_input2 $user_input3"
@@ -642,18 +643,21 @@ function function_controller() {
 
 function debug() {
     debug_command=$1
-    if [[ -z $debug_command ]]; then
+    if [[ -z "$debug_command" ]]; then
         help_message
         return
     fi
+    debug_arg1="$2"
+    debug_arg2="$3"
     echo "##########Debugging##########"
     set -x
-    function_controller $debug_command
+    function_controller $debug_command $debug_arg1 $debug_arg2
 }
 
 check_requirements
 user_input="$1"
 user_input2="$2"
 user_input3="$3"
-function_controller $user_input $user_input2 $user_input3
+user_input4="$4"
+function_controller $user_input $user_input2 $user_input3 $user_input4
 exit 0

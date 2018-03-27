@@ -28,6 +28,8 @@ function enable_firewall() {
     ufw default deny incoming
     ufw default deny outgoing
     ufw allow out on $vpn_interface from any to any
+    #only allow connection to api.protonmail.ch
+    ufw allow out from any to 185.70.40.185 port 443
     ufw enable
 }
 

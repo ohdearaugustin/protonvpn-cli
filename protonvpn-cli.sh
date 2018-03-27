@@ -266,9 +266,11 @@ function connect_to_fastest_vpn() {
   fi
 
   echo "Fetching ProtonVPN Servers..."
-  config_id=$(get_fastest_vpn_connection_id)
+  config=$(get_fastest_vpn_connection_config)
+  config_id=$(echo "$config" | cut -d " " -f1)
+  config_ip=$(echo "$config" | cut -d " " -f2)
   selected_protocol="udp"
-  openvpn_connect "$config_id" "$selected_protocol"
+  openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
 
 function connect_to_random_vpn() {
@@ -347,7 +349,7 @@ function connection_to_vpn_via_dialog_menu() {
   openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
 
-function get_fastest_vpn_connection_id() {
+function get_fastest_vpn_connection_config() {
   firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
@@ -383,10 +385,10 @@ for _ in candidates1:
     if (_["Score"] < min_score["Score"]):
         candidates2.append(_)
 if len(candidates2) == 0:
-    vpn_connection_id = random.choice(candidates1)["Servers"][0]["ID"]
+    vpn_connection_config = random.choice(candidates1)["Servers"][0]
 else:
-    vpn_connection_id = random.choice(candidates2)["Servers"][0]["ID"]
-print(vpn_connection_id)
+    vpn_connection_config = random.choice(candidates2)["Servers"][0]
+print(vpn_connection_config["ID"] + " " +vpn_connection_config["EntryIP"])
 END`
 
   echo "$output"

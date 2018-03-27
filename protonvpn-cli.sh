@@ -17,7 +17,16 @@ if [[ ("$UID" != 0) && ("$1" != "ip") && ("$1" != "-ip") && \
   exit 1
 fi
 
-source protonvpn-killswitch.sh
+#Source Killswitch and check if file exists
+source protonvpn-killswitch
+if [[ $? -ne 0 ]]; then
+    echo "Source from different location"
+    source protonvpn-killswitch.sh
+    if [[ $? -ne 0 ]]; then
+        echo "[!] Error: The program needs protonvpn-killswitch or protonvpn-killswitch.sh!"
+        exit 1
+    fi
+fi
 
 function check_requirements() {
   if [[ $(which openvpn) == "" ]]; then

@@ -4,7 +4,7 @@
 ![protonvpn-cli](https://i.imgur.com/tDrwkX5l.png)
 
 # Overview #
-protonvpn-cli is a command-line tool for Linux and MacOS.
+protonvpn-cli is a command-line tool for Linux and macOS.
 
 # Requirements #
 
@@ -22,7 +22,13 @@ The program automatically checks for missing requirements.
 ```bash
 $ git clone "https://github.com/protonvpn/protonvpn-cli"
 $ cd protonvpn-cli
-$ ./protonvpn-cli.sh -install
+$ sudo ./protonvpn-cli.sh -install
+```
+
+### Or (one-liner): ###
+
+```bash
+$ sudo bash -c "git clone https://github.com/ProtonVPN/protonvpn-cli.git ; ./protonvpn-cli/protonvpn-cli.sh -install"
 ```
 
 # Usage #
@@ -36,13 +42,16 @@ $ ./protonvpn-cli.sh -install
 | `protonvpn-cli -fastest-connect` | Connect to a fast ProtonVPN VPN.              |
 | `protonvpn-cli -disconnect`      | Disconnect from VPN.                          |
 | `protonvpn-cli -ip`              | Print the current public IP address.          |
+| `protonvpn-cli -update`          | Update protonvpn-cli.                         |
 | `protonvpn-cli -install`         | Install protonvpn-cli.                        |
 | `protonvpn-cli -uninstall`       | Uninstall protonvpn-cli.                      |
 | `protonvpn-cli -debug -command`  | Debug a the specified command.                      |
 | `protonvpn-cli -help`            | Show help message.                            |
 
 
+protonvpn-cli can also be used by typing `pvpn`, once installed.
+
 
 # Compatibility #
 * Linux
-* MacOS
+* macOS

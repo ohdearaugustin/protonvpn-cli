@@ -3,12 +3,11 @@
 # ProtonVPN CLI
 # ProtonVPN Command-Line Tool
 #
-# Made with <3 for Linux + MacOS.
+# Made with <3 for Linux + macOS.
 ###
 #Author: Mazin Ahmed <Mazin AT ProtonMail DOT ch>
 ######################################################
 
-#""|"-h"|"--help"|"--h"|"-help"|"help")
 
 if [[ ("$UID" != 0) && ("$1" != "ip") && ("$1" != "-ip") && \
       ("$1" != "--ip") && !( -z "$1") && ("$1" != "-h") && \
@@ -52,6 +51,19 @@ function check_requirements() {
   fi
 }
 
+function get_home() {
+  if [[ -z "$SUDO_USER" ]]; then
+    CURRENT_USER="$(whoami)"
+  else
+    CURRENT_USER="$SUDO_USER"
+  fi
+  USER_HOME=$(getent passwd "$CURRENT_USER" 2> /dev/null | cut -d: -f6)
+  if [[ -z "$USER_HOME" ]]; then
+    USER_HOME="$HOME"
+  fi
+  echo "$USER_HOME"
+}
+
 function install_openvpn_update_resolv_conf() {
   if [[ ("$UID" != 0) ]]; then
     echo "[!] Error: installation requires root access."
@@ -91,14 +103,14 @@ function check_ip() {
 }
 
 function init_cli() {
-  rm -rf ~/.protonvpn-cli/  # Previous profile will be removed/overwritten, if any.
-  mkdir -p ~/.protonvpn-cli/
+  rm -rf "$(get_home)/.protonvpn-cli/"  # Previous profile will be removed/overwritten, if any.
+  mkdir -p "$(get_home)/.protonvpn-cli/"
 
   read -p "Enter OpenVPN username: " "openvpn_username"
   read -s -p "Enter OpenVPN password: " "openvpn_password"
-  echo -e "$openvpn_username\n$openvpn_password" > ~/.protonvpn-cli/protonvpn_openvpn_credentials
-  chown "$USER:$(id -gn $USER)" ~/.protonvpn-cli/protonvpn_openvpn_credentials
-  chmod 0400 ~/.protonvpn-cli/protonvpn_openvpn_credentials
+  echo -e "$openvpn_username\n$openvpn_password" > "$(get_home)/.protonvpn-cli/protonvpn_openvpn_credentials"
+  chown "$USER:$(id -gn $USER)" "$(get_home)/.protonvpn-cli/protonvpn_openvpn_credentials"
+  chmod 0400 "$(get_home)/.protonvpn-cli/protonvpn_openvpn_credentials"
 
   echo -e "\n[.] ProtonVPN Plans:\n1) Free\n2) Basic\n3) Plus\n4) Visionary"
   protonvpn_tier=""
@@ -115,26 +127,51 @@ function init_cli() {
       echo "Invalid input."
     ;; esac
   done
-  echo -e "$protonvpn_tier" > ~/.protonvpn-cli/protonvpn_tier
-  chown "$USER:$(id -gn $USER)" ~/.protonvpn-cli/protonvpn_tier
-  chmod 0400 ~/.protonvpn-cli/protonvpn_tier
+  echo -e "$protonvpn_tier" > "$(get_home)/.protonvpn-cli/protonvpn_tier"
+  chown "$USER:$(id -gn $USER)" "$(get_home)/.protonvpn-cli/protonvpn_tier"
+  chmod 0400 "$(get_home)/.protonvpn-cli/protonvpn_tier"
 
-  chown -R "$USER:$(id -gn $USER)" ~/.protonvpn-cli/
-  chmod -R 0400 ~/.protonvpn-cli/
+  chown -R "$USER:$(id -gn $USER)" "$(get_home)/.protonvpn-cli/"
+  chmod -R 0400 "$(get_home)/.protonvpn-cli/"
 
   echo "[*] Done."
 }
 
 function manage_ipv6() {
   # ProtonVPN support for IPv6 coming soon.
+  errors_counter=0
   if [[ "$1" == "disable" ]]; then
-    sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null
-    sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null
+    if [ ! -z "$(ip -6 a)" ]; then
+
+      #save linklocal address and disable ipv6
+      ip -6 a | awk '/inet6 fe80/ {print $2}' > "$(get_home)/.protonvpn-cli/.ipv6_address"
+      if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
+      sysctl -w net.ipv6.conf.all.disable_ipv6=1 &> /dev/null
+      if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
+      sysctl -w net.ipv6.conf.default.disable_ipv6=1 &> /dev/null
+      if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
+    fi
   fi
 
   if [[ "$1" == "enable" ]]; then
-    sysctl -w net.ipv6.conf.all.disable_ipv6=0 > /dev/null
-    sysctl -w net.ipv6.conf.default.disable_ipv6=0 > /dev/null
+    sysctl -w net.ipv6.conf.all.disable_ipv6=0 &> /dev/null
+    if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
+    sysctl -w net.ipv6.conf.default.disable_ipv6=0 &> /dev/null
+    if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
+    #restore linklocal on default interface
+    ip addr add $(cat "$(get_home)/.protonvpn-cli/.ipv6_address") dev $(ip r | awk '/default/ {print $5}') &> /dev/null
+    if [[ ($? != 0) && ($? != 255) ]]; then errors_counter=$((errors_counter+1)) ; fi
+
+  fi
+
+  if [[ $errors_counter != 0 ]]; then
+    echo "[!] There are issues in managing ipv6 in the system. Please test the system for the root cause."
+    echo "Not able to manage ipv6 by protonvpn-cli might cause issues in leaking the system's ipv6 address."
   fi
 }
 
@@ -145,7 +182,7 @@ function modify_dns_resolvconf() {
   fi
 
   if [[ "$1" == "to_protonvpn_dns" ]]; then
-    if [[ $(cat ~/.protonvpn-cli/protonvpn_tier) == "0" ]]; then
+    if [[ $(cat "$(get_home)/.protonvpn-cli/protonvpn_tier") == "0" ]]; then
       dns_server="10.8.0.1" # free tier dns
     else
       dns_server="10.8.8.1" # paid tier dns
@@ -212,7 +249,7 @@ function openvpn_connect() {
   wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 10 -q -O /dev/stdout "https://api.protonmail.ch/vpn/config?Platform=linux&ServerID=$config_id&Protocol=$selected_protocol" \
-    | openvpn --daemon --config "/dev/stdin" --auth-user-pass ~/.protonvpn-cli/protonvpn_openvpn_credentials --auth-nocache
+    | openvpn --daemon --config "/dev/stdin" --auth-user-pass "$(get_home)/.protonvpn-cli/protonvpn_openvpn_credentials" --auth-nocache
 
   echo "Connecting..."
 
@@ -237,35 +274,64 @@ function openvpn_connect() {
   exit 1
 }
 
+function update_cli() {
+  if [[ "$(check_ip)" == "Error." ]]; then
+    echo "[!] Error: There is an internet connection issue."
+    exit 1
+  fi
+  cli_path="/usr/local/bin/protonvpn-cli"
+  if [[ ! -f "$cli_path" ]]; then
+    echo "[!] Error: protonvpn-cli does not seem to be installed."
+    exit 1
+  fi
+  echo "[#] Checking for update."
+  current_local_hashsum=$(sha512sum "$cli_path" | cut -d " " -f1)
+  remote_=$(wget --timeout 6 -q -O /dev/stdout 'https://raw.githubusercontent.com/ProtonVPN/protonvpn-cli/master/protonvpn-cli.sh')
+  if [[ $? != 0 ]]; then
+    echo "[!] Error: There is an error updating protonvpn-cli."
+    exit 1
+  fi
+  remote_hashsum=$( echo "$remote_" | sha512sum | cut -d ' ' -f1)
+
+  if [[ "$current_local_hashsum" == "$remote_hashsum" ]]; then
+    echo "[*] protonvpn-cli is up-to-date!"
+    exit 0
+  else
+    echo "[#] A new update is available."
+    echo "[#] Updating..."
+    wget -q --timeout 20 -O "$cli_path" 'https://raw.githubusercontent.com/ProtonVPN/protonvpn-cli/master/protonvpn-cli.sh'
+    if [[ $? == 0 ]]; then
+      echo "[#] protonvpn-cli has been updated successfully."
+      exit 0
+    else
+      echo "[!] Error: There is an error updating protonvpn-cli."
+      exit 1
+    fi
+  fi
+}
+
 function install_cli() {
   mkdir -p "/usr/bin/"
   cli="$( cd "$(dirname "$0")" ; pwd -P )/$0"
   errors_counter=0
   cp "$cli" "/usr/local/bin/protonvpn-cli" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   ln -s -f "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   ln -s -f "/usr/local/bin/protonvpn-cli" "/usr/bin/protonvpn-cli" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   ln -s -f "/usr/local/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   chown "$USER:$(id -gn $USER)" "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" "/usr/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   chmod 0755 "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" "/usr/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
-  
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   if [[ ($errors_counter == 0) || ( $(which protonvpn-cli) != "" ) ]]; then
     echo "[*] Done."
   else
@@ -276,14 +342,11 @@ function install_cli() {
 function uninstall_cli() {
   errors_counter=0
   rm -f "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" "/usr/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
-  rm -rf ~/.protonvpn-cli/ &> /dev/null
-  if [[ $? != 0 ]]; then
-   errors_counter=$((errors_counter+1))
-  fi
-  
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
+  rm -rf "$(get_home)/.protonvpn-cli/" &> /dev/null
+  if [[ $? != 0 ]]; then errors_counter=$((errors_counter+1)); fi
+
   if [[ ($errors_counter == 0) || ( $(which protonvpn-cli) == "" ) ]]; then
     echo "[*] Done."
   else
@@ -292,7 +355,7 @@ function uninstall_cli() {
 }
 
 function check_if_profile_initialized() {
-  _=$(cat ~/.protonvpn-cli/protonvpn_openvpn_credentials ~/.protonvpn-cli/protonvpn_tier &> /dev/null)
+  _=$(cat "$(get_home)/.protonvpn-cli/protonvpn_openvpn_credentials" "$(get_home)/.protonvpn-cli/protonvpn_tier" &> /dev/null)
   if [[ $? != 0 ]]; then
     echo "[!] Profile is not initialized."
     echo -e "Initialize your profile using: \n    $(basename $0) -init"
@@ -301,17 +364,7 @@ function check_if_profile_initialized() {
 }
 
 function connect_to_fastest_vpn() {
-  check_if_profile_initialized
-  if [[ $(is_openvpn_currently_running) == true ]]; then
-    echo "[!] Error: OpenVPN is already running on this machine."
-    exit 1
-  fi
-  if [[ "$(check_ip)" == "Error." ]]; then
-    echo "[!] Error: There is an internet connection issue."
-    exit 1
-  fi
 
-  echo "Fetching ProtonVPN Servers..."
   config_id=$(get_fastest_vpn_connection_id)
   selected_protocol="udp"
   openvpn_connect "$config_id" "$selected_protocol"
@@ -333,6 +386,39 @@ function connect_to_random_vpn() {
   available_protocols=("tcp" "udp")
   selected_protocol=${available_protocols[$RANDOM % ${#available_protocols[@]}]}
   openvpn_connect "$config_id" "$selected_protocol"
+}
+
+function connect_to_specific_server() {
+  check_if_profile_initialized
+  if [[ $(is_openvpn_currently_running) == true ]]; then
+    echo "[!] Error: OpenVPN is already running on this machine."
+    exit 1
+  fi
+  if [[ "$(check_ip)" == "Error." ]]; then
+    echo "[!] Error: There is an internet connection issue."
+    exit 1
+  fi
+
+  echo "Fetching ProtonVPN Servers..."
+
+  server_list=$(get_vpn_config_details | tr ' ' '@')
+  if [[ "${2,,}" == "tcp" ]]; then
+    protocol="tcp"
+  else
+    protocol="udp"
+  fi
+
+  for i in $server_list; do
+    id=$(echo "$i" | cut -d"@" -f1)
+    name=$(echo "$i" | cut -d"@" -f2)
+    if [[ "${name,,}" == "${1,,}" ]]; then
+      openvpn_connect "$id" "$protocol"
+    fi
+  done
+
+  # If not found in $server_list.
+  echo "[!] Error: Invalid server name, or server not accessible with your plan."
+  exit 1
 }
 
 function connection_to_vpn_via_dialog_menu() {
@@ -394,7 +480,7 @@ function get_fastest_vpn_connection_id() {
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
-  tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
+  tier=$(cat "$(get_home)/.protonvpn-cli/protonvpn_tier")
   output=`python <<END
 import json, random
 json_parsed_response = json.loads("""$response_output""")
@@ -446,7 +532,7 @@ function get_random_vpn_connection_id() {
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
-  tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
+  tier=$(cat "$(get_home)/.protonvpn-cli/protonvpn_tier")
   output=`python <<END
 import json, random
 json_parsed_response = json.loads("""$response_output""")
@@ -464,7 +550,7 @@ function get_vpn_config_details() {
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
-  tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
+  tier=$(cat "$(get_home)/.protonvpn-cli/protonvpn_tier")
   output=`python <<END
 import json, random
 json_parsed_response = json.loads("""$response_output""")
@@ -499,48 +585,58 @@ function help_message() {
     echo -e "ProtonVPN Command-Line Tool\n"
     echo -e "Usage: $(basename $0) [option]\n"
     echo "Options:"
-    echo "   -init, --init            Initialize ProtonVPN profile on the machine."
-    echo "   -c, -connect             Select a VPN from ProtonVPN menu."
-    echo "   -r, -random-connect      Connect to a random ProtonVPN VPN."
-    echo "   -f, -fastest-connect     Connect to a fast ProtonVPN VPN."
-    echo "   -d, -disconnect          Disconnect from VPN."
-    echo "   -ip                      Print the current public IP address."
-    echo "   -install                 Install protonvpn-cli."
-    echo "   -uninstall               Uninstall protonvpn-cli."
-    echo "   -debug -command          Run a command in debug mode."
-    echo "   -h, --help               Show help message."
+    echo "   -init, --init                      Initialize ProtonVPN profile on the machine."
+    echo "   -c, -connect [name [protocol]]     Select a VPN from ProtonVPN menu or connect to a VPN by name"
+    echo "   -r, -random-connect                Connect to a random ProtonVPN VPN."
+    echo "   -f, -fastest-connect               Connect to a fast ProtonVPN VPN."
+    echo "   -d, -disconnect                    Disconnect from VPN."
+    echo "   -ip                                Print the current public IP address."
+    echo "   -update                            Update protonvpn-cli."
+    echo "   -install                           Install protonvpn-cli."
+    echo "   -uninstall                         Uninstall protonvpn-cli."
+    echo "   -debug -command                    Run a command in debug mode."
+    echo "   -h, --help                         Show help message."
     echo
+
     exit 0
 }
 
 function function_controller() {
     user_input="$1"
     user_input2="$2"
+    user_input3="$3"
     case $user_input in
     ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
-      ;;
+        ;;
     "-d"|"--d"|"-disconnect"|"--disconnect") openvpn_disconnect
-      ;;
+        ;;
     "-r"|"--r"|"-random"|"--random"|"-random-connect") connect_to_random_vpn
-      ;;
+        ;;
     "-f"|"--f"|"-fastest"|"--fastest"|"-fastest-connect") connect_to_fastest_vpn
-      ;;
-    "-c"|"--c"|"-connect"|"--connect") connection_to_vpn_via_dialog_menu
-      ;;
+        ;;
+    "-c"|"-connect"|"--c"|"--connect")
+        if [[ $# == 1 ]]; then
+            connection_to_vpn_via_dialog_menu
+        elif [[ $# > 1 ]]; then
+            connect_to_specific_server "$user_input2" "$user_input3"
+        fi
+        ;;
     "ip"|"-ip"|"--ip") check_ip
-      ;;
+        ;;
+    "update"|"-update"|"--update") update_cli
+        ;;
     "-init"|"--init") init_cli
-      ;;
+        ;;
     "-install"|"--install") install_cli
-      ;;
+        ;;
     "-uninstall"|"--uninstall") uninstall_cli
-      ;;
+        ;;
     "-debug"|"--debug") debug $user_input2
-      ;;
+        ;;
     *)
-    echo "[!] Invalid input: $user_input $user_input2"
-    help_message
-      ;;
+    echo "[!] Invalid input: $user_input $user_input2 $user_input3"
+        help_message
+        ;;
     esac
 }
 
@@ -558,5 +654,6 @@ function debug() {
 check_requirements
 user_input="$1"
 user_input2="$2"
-function_controller $user_input $user_input2
+user_input3="$3"
+function_controller $user_input $user_input2 $user_input3
 exit 0

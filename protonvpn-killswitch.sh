@@ -21,6 +21,11 @@ function check_requirements() {
     fi
 }
 
+#silent ufw output
+function s_ufw() {
+    ufw "$@" > /dev/null
+}
+
 function modify_hosts() {
     if [[ "$1" == "backup_hostsconf" ]]; then
         cp "/etc/hosts" "/etc/hosts.protonvpn_backup" #backing-up current hosts
@@ -41,18 +46,18 @@ function enable_firewall() {
     modify_hosts backup_hostsconf
     modify_hosts add_api
     vpn_interface="$1"
-    ufw --force reset
-    ufw default deny incoming
-    ufw default deny outgoing
-    ufw allow out on $vpn_interface from any to any
+    s_ufw --force reset
+    s_ufw default deny incoming
+    s_ufw default deny outgoing
+    s_ufw allow out on $vpn_interface from any to any
     ufw enable
 }
 
 function disable_firewall() {
     echo "Disable Killswitch"
-    ufw --force reset
-    ufw default deny incoming
-    ufw default allow outgoing
+    s_ufw --force reset
+    s_ufw default deny incoming
+    s_ufw default allow outgoing
     ufw enable
     modify_hosts revert_to_backup
 }
@@ -64,21 +69,21 @@ function modify_firewall() {
 
     if [[ $method == "open" ]]; then
         if [[ $proto == "udp" ]]; then
-            ufw allow out from any to $ip port 1194 proto udp > /dev/null
+            s_ufw allow out from any to $ip port 1194 proto udp
         fi
 
         if [[ $proto == "tcp" ]]; then
-            ufw allow out from any to $ip port 443 proto tcp > /dev/null
+            s_ufw allow out from any to $ip port 443 proto tcp
         fi
     fi
 
     if [[ $method == "close" ]]; then
         if [[ $proto == "udp" ]]; then
-            ufw deny out from any to $ip port 1194 proto udp > /dev/null
+            s_ufw deny out from any to $ip port 1194 proto udp
         fi
 
         if [[ $proto == "tcp" ]]; then
-            ufw deny out from any to $ip port 443 proto tcp > /dev/null
+            s_ufw deny out from any to $ip port 443 proto tcp
         fi
     fi
 }

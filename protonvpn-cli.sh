@@ -18,6 +18,16 @@ if [[ ("$UID" != 0) && ("$1" != "ip") && ("$1" != "-ip") && \
   exit 1
 fi
 
+#Source Killswitch and check if file exists
+source protonvpn-killswitch
+if [[ $? -ne 0 ]]; then
+    source protonvpn-killswitch.sh
+    if [[ $? -ne 0 ]]; then
+        echo "[!] Error: The program needs protonvpn-killswitch or protonvpn-killswitch.sh!"
+        exit 1
+    fi
+fi
+
 function check_requirements() {
   if [[ $(which openvpn) == "" ]]; then
     echo "[!] Error: openvpn is not installed. Install \`openvpn\` package to continue."
@@ -76,7 +86,7 @@ function check_ip() {
     if [[ $counter -gt 0 ]]; then
       sleep 2
     fi
-
+    firewall_api open
     if [[ $counter -lt 3 ]]; then
       ip=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
         --header 'Accept: application/vnd.protonmail.v1+json' \
@@ -88,6 +98,7 @@ function check_ip() {
     fi
   done
   echo "$ip"
+  firewall_api close
 }
 
 function init_cli() {
@@ -202,17 +213,23 @@ function openvpn_connect() {
   modify_dns_resolvconf backup_resolvconf # backuping-up current resolv.conf
 
   config_id=$1
-  selected_protocol=$2
+  config_ip=$2
+  selected_protocol=$3
   if [[ $selected_protocol == "" ]]; then
     selected_protocol="udp"  # Default protocol
   fi
 
   current_ip="$(check_ip)"
 
+  firewall_api open
+  modify_firewall open $config_ip $selected_protocol
+
   wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 10 -q -O /dev/stdout "https://api.protonmail.ch/vpn/config?Platform=linux&ServerID=$config_id&Protocol=$selected_protocol" \
     | openvpn --daemon --config "/dev/stdin" --auth-user-pass ~/.protonvpn-cli/protonvpn_openvpn_credentials --auth-nocache
+
+  firewall_api close
 
   echo "Connecting..."
 
@@ -227,6 +244,7 @@ function openvpn_connect() {
 
       echo "[$] Connected!"
       echo "[#] New IP: $new_ip"
+      modify_firewall close $config_ip $selected_protocol
       exit 0
     fi
 
@@ -234,14 +252,20 @@ function openvpn_connect() {
   done
   echo "[!] Error connecting to VPN."
   openvpn_disconnect quiet
+  modify_firewall close $config_ip $selected_protocol
   exit 1
 }
 
 function install_cli() {
   mkdir -p "/usr/bin/"
   cli="$( cd "$(dirname "$0")" ; pwd -P )/$0"
+  killswitch="$( cd "$(dirname "$0")" ; pwd -P)/protonvpn-killswitch.sh"
   errors_counter=0
   cp "$cli" "/usr/local/bin/protonvpn-cli" &> /dev/null
+  if [[ $? != 0 ]]; then
+   errors_counter=$((errors_counter+1))
+  fi
+  cp "$killswitch" "/usr/local/bin/protonvpn-killswitch" &> /dev/null
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
@@ -249,7 +273,15 @@ function install_cli() {
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
+  ln -s -f "/usr/local/bin/protonvpn-killswitch" "/usr/local/bin/pvpn-killswitch" &> /dev/null
+  if [[ $? != 0 ]]; then
+   errors_counter=$((errors_counter+1))
+  fi
   ln -s -f "/usr/local/bin/protonvpn-cli" "/usr/bin/protonvpn-cli" &> /dev/null
+  if [[ $? != 0 ]]; then
+   errors_counter=$((errors_counter+1))
+  fi
+  ln -s -f "/usr/local/bin/protonvpn-killswitch" "/usr/bin/protonvpn-killswitch" &> /dev/null
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
@@ -257,16 +289,20 @@ function install_cli() {
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
-  chown "$USER:$(id -gn $USER)" "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" "/usr/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
+  ln -s -f "/usr/local/bin/protonvpn-killswitch" "/usr/bin/pvpn-killswitch" &> /dev/null
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
-  chmod 0755 "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" "/usr/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
+  chown "$USER:$(id -gn $USER)" "/usr/local/bin/protonvpn-cli" "/usr/local/bin/protonvpn-killswitch" "/usr/local/bin/pvpn" "/usr/local/bin/pvpn-killswitch" "/usr/bin/protonvpn-cli" "/usr/bin/protonvpn-killswitch" "/usr/bin/pvpn" "/usr/bin/pvpn-killswitch" &> /dev/null
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
-  
-  if [[ ($errors_counter == 0) || ( $(which protonvpn-cli) != "" ) ]]; then
+  chmod 0755 "/usr/local/bin/protonvpn-cli" "/usr/local/bin/protonvpn-killswitch" "/usr/local/bin/pvpn" "/usr/local/bin/pvpn-killswitch" "/usr/bin/protonvpn-cli" "/usr/bin/protonvpn-killswitch" "/usr/bin/pvpn" "/usr/bin/pvpn-killswitch" &> /dev/null
+  if [[ $? != 0 ]]; then
+   errors_counter=$((errors_counter+1))
+  fi
+
+  if [[ ($errors_counter == 0) || ( $(which protonvpn-cli) != "" ) || $(which protonvpn-killswitch) != "" ]]; then
     echo "[*] Done."
   else
     echo "[!] Error: There was an error in installing protonvpn-cli."
@@ -275,7 +311,7 @@ function install_cli() {
 
 function uninstall_cli() {
   errors_counter=0
-  rm -f "/usr/local/bin/protonvpn-cli" "/usr/local/bin/pvpn" "/usr/bin/protonvpn-cli" "/usr/bin/pvpn" &> /dev/null
+  rm -f "/usr/bin/pvpn" "/usr/local/bin/protonvpn-cli" "/usr/local/bin/protonvpn-killswitch" "/usr/local/bin/pvpn" "/usr/local/bin/pvpn-killswitch" "/usr/bin/protonvpn-cli" "/usr/bin/protonvpn-killswitch" "/usr/bin/pvpn" "/usr/bin/pvpn-killswitch"&> /dev/null
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
@@ -283,8 +319,8 @@ function uninstall_cli() {
   if [[ $? != 0 ]]; then
    errors_counter=$((errors_counter+1))
   fi
-  
-  if [[ ($errors_counter == 0) || ( $(which protonvpn-cli) == "" ) ]]; then
+
+  if [[ ($errors_counter == 0) || ( $(which protonvpn-cli) == "" ) || $(which protonvpn-killswitch) == "" ]]; then
     echo "[*] Done."
   else
     echo "[!] Error: There was an error in uninstalling protonvpn-cli."
@@ -312,9 +348,11 @@ function connect_to_fastest_vpn() {
   fi
 
   echo "Fetching ProtonVPN Servers..."
-  config_id=$(get_fastest_vpn_connection_id)
+  config=$(get_fastest_vpn_connection_config)
+  config_id=$(echo "$config" | cut -d " " -f1)
+  config_ip=$(echo "$config" | cut -d " " -f2)
   selected_protocol="udp"
-  openvpn_connect "$config_id" "$selected_protocol"
+  openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
 
 function connect_to_random_vpn() {
@@ -329,10 +367,12 @@ function connect_to_random_vpn() {
   fi
 
   echo "Fetching ProtonVPN Servers..."
-  config_id=$(get_random_vpn_connection_id)
+  config=$(get_random_vpn_connection_config)
+  config_id=$(echo "$config" | cut -d " " -f1)
+  config_ip=$(echo "$config" | cut -d " " -f2)
   available_protocols=("tcp" "udp")
   selected_protocol=${available_protocols[$RANDOM % ${#available_protocols[@]}]}
-  openvpn_connect "$config_id" "$selected_protocol"
+  openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
 
 function connection_to_vpn_via_dialog_menu() {
@@ -375,6 +415,7 @@ function connection_to_vpn_via_dialog_menu() {
     if [[ $c -eq $config_id ]]; then
       ID=$(echo "$i" | cut -d " " -f1)
       config_id=$ID
+      config_ip=$(echo "$i" | cut -d " " -f2 | cut -d "@" -f4)
       break
     fi
     c=$((c+1))
@@ -387,13 +428,15 @@ function connection_to_vpn_via_dialog_menu() {
     exit 2
   fi
 
-  openvpn_connect "$config_id" "$selected_protocol"
-
+  openvpn_connect "$config_id" "$config_ip" "$selected_protocol"
 }
-function get_fastest_vpn_connection_id() {
+
+function get_fastest_vpn_connection_config() {
+  firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
+  firewall_api close
   tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
   output=`python <<END
 import json, random
@@ -431,21 +474,21 @@ for _ in candidates1:
     if (_["Score"] < min_score["Score"]):
         candidates2.append(_)
 if len(candidates2) == 0:
-    vpn_connection_id = random.choice(candidates1)["Servers"][0]["ID"]
+    vpn_connection_config = random.choice(candidates1)["Servers"][0]
 else:
-    vpn_connection_id = random.choice(candidates2)["Servers"][0]["ID"]
-
-print(vpn_connection_id)
-
+    vpn_connection_config = random.choice(candidates2)["Servers"][0]
+print(vpn_connection_config["ID"] + " " +vpn_connection_config["EntryIP"])
 END`
 
   echo "$output"
 }
 
-function get_random_vpn_connection_id() {
+function get_random_vpn_connection_config() {
+  firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
+  firewall_api close
   tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
   output=`python <<END
 import json, random
@@ -454,16 +497,19 @@ output = []
 for _ in json_parsed_response["LogicalServers"]:
     if (_["Tier"] <= int("""$tier""")):
         output.append(_)
-print(random.choice(output)["Servers"][0]["ID"])
+choice = random.choice(output)["Servers"][0]
+print(choice["ID"] + " " + choice["EntryIP"])
 END`
 
   echo "$output"
 }
 
 function get_vpn_config_details() {
+  firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
+  firewall_api close
   tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
   output=`python <<END
 import json, random
@@ -499,23 +545,41 @@ function help_message() {
     echo -e "ProtonVPN Command-Line Tool\n"
     echo -e "Usage: $(basename $0) [option]\n"
     echo "Options:"
-    echo "   -init, --init            Initialize ProtonVPN profile on the machine."
-    echo "   -c, -connect             Select a VPN from ProtonVPN menu."
-    echo "   -r, -random-connect      Connect to a random ProtonVPN VPN."
-    echo "   -f, -fastest-connect     Connect to a fast ProtonVPN VPN."
-    echo "   -d, -disconnect          Disconnect from VPN."
-    echo "   -ip                      Print the current public IP address."
-    echo "   -install                 Install protonvpn-cli."
-    echo "   -uninstall               Uninstall protonvpn-cli."
-    echo "   -debug -command          Run a command in debug mode."
+    echo "   -init, --init                  Initialize ProtonVPN profile on the machine."
+    echo "   -c, -connect                   Select a VPN from ProtonVPN menu."
+    echo "   -r, -random-connect            Connect to a random ProtonVPN VPN."
+    echo "   -f, -fastest-connect           Connect to a fast ProtonVPN VPN."
+    echo "   -d, -disconnect                Disconnect from VPN."
+    echo "   -ip                            Print the current public IP address."
+    echo "   -install                       Install protonvpn-cli."
+    echo "   -uninstall                     Uninstall protonvpn-cli."
+    echo "   -debug -command                Run a command in debug mode."
+    echo "   -killswitch enable/disable      Enables or disables Killswitch."
     echo "   -h, --help               Show help message."
     echo
     exit 0
 }
 
+function killswitch() {
+    user_input=$1
+    case $user_input in
+        "e"|"enable")
+            enable_firewall tun0
+            ;;
+        "disable")
+            disable_firewall
+            ;;
+        *)
+        echo "[!] Invalid input: $user_input"
+        help_message
+          ;;
+    esac
+}
+
 function function_controller() {
-    user_input="$1"
-    user_input2="$2"
+    user_input=$1
+    user_input2=$2
+    user_input3=$3
     case $user_input in
     ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
       ;;
@@ -535,7 +599,9 @@ function function_controller() {
       ;;
     "-uninstall"|"--uninstall") uninstall_cli
       ;;
-    "-debug"|"--debug") debug $user_input2
+    "-debug"|"--debug") debug $user_input2 $user_input3
+      ;;
+    "-killswitch"|"--killswitch") killswitch $user_input2
       ;;
     *)
     echo "[!] Invalid input: $user_input $user_input2"
@@ -546,17 +612,19 @@ function function_controller() {
 
 function debug() {
     debug_command=$1
+    debug_command_arg=$2
     if [[ -z $debug_command ]]; then
         help_message
         return
     fi
     echo "##########Debugging##########"
     set -x
-    function_controller $debug_command
+    function_controller $debug_command $debug_command_arg
 }
 
 check_requirements
 user_input="$1"
 user_input2="$2"
-function_controller $user_input $user_input2
+user_input3="$3"
+function_controller $user_input $user_input2 $user_input3
 exit 0

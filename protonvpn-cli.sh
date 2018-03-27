@@ -457,6 +457,9 @@ function killswitch() {
 }
 
 function function_controller() {
+    user_input=$1
+    user_input2=$2
+    user_input3=$3
     case $user_input in
     ""|"-h"|"--help"|"--h"|"-help"|"help") help_message
       ;;
@@ -503,5 +506,5 @@ check_requirements
 user_input="$1"
 user_input2="$2"
 user_input3="$3"
-function_controller
+function_controller $user_input $user_input2 $user_input3
 exit 0

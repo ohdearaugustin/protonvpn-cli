@@ -38,7 +38,7 @@ $ ./protonvpn-cli.sh -install
 | `protonvpn-cli -ip`              | Print the current public IP address.          |
 | `protonvpn-cli -install`         | Install protonvpn-cli.                        |
 | `protonvpn-cli -uninstall`       | Uninstall protonvpn-cli.                      |
-| `protonvpn-cli -debug -command`  | Uninstall protonvpn-cli.                      |
+| `protonvpn-cli -debug -command`  | Debug specified command.                      |
 | `protonvpn-cli -help`            | Show help message.                            |
 
 

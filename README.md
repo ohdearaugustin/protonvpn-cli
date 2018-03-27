@@ -13,6 +13,7 @@ protonvpn-cli is a command-line tool for Linux and MacOS.
 * `dialog`
 * `wget`
 * `sysctl`
+*  `ufw`
 
 The program automatically checks for missing requirements.
 
@@ -39,6 +40,7 @@ $ ./protonvpn-cli.sh -install
 | `protonvpn-cli -install`         | Install protonvpn-cli.                        |
 | `protonvpn-cli -uninstall`       | Uninstall protonvpn-cli.                      |
 | `protonvpn-cli -debug -command`  | Run a comman in debug mode.                      |
+| `protonvpn-cli -killswitch enable/disable` | Enables or disables Killswitch.               | 
 | `protonvpn-cli -help`            | Show help message.                            |
 
 

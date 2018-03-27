@@ -58,7 +58,7 @@ function check_ip() {
     if [[ $counter -gt 0 ]]; then
       sleep 2
     fi
-
+    firewall_api open
     if [[ $counter -lt 3 ]]; then
       ip=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
         --header 'Accept: application/vnd.protonmail.v1+json' \
@@ -70,6 +70,7 @@ function check_ip() {
     fi
   done
   echo "$ip"
+  firewall_api close
 }
 
 function init_cli() {
@@ -190,10 +191,14 @@ function openvpn_connect() {
 
   current_ip=$(check_ip)
 
+  firewall_api open
+
   wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 4 -q -O /dev/stdout "https://api.protonmail.ch/vpn/config?Platform=linux&ServerID=$config_id&Protocol=$selected_protocol" \
     | openvpn --daemon --config "/dev/stdin" --auth-user-pass ~/.protonvpn-cli/protonvpn_openvpn_credentials --auth-nocache
+
+  firewall_api close
 
   echo "Connecting..."
 
@@ -337,9 +342,11 @@ function connection_to_vpn_via_dialog_menu() {
 
 }
 function get_fastest_vpn_connection_id() {
+  firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
+  firewall_api close
   tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
   output=`python <<END
 import json, random
@@ -380,9 +387,11 @@ END`
 }
 
 function get_random_vpn_connection_id() {
+  firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
+  firewall_api close
   tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
   output=`python <<END
 import json, random
@@ -398,9 +407,11 @@ END`
 }
 
 function get_vpn_config_details() {
+  firewall_api open
   response_output=$(wget --header 'x-pm-appversion: Other' --header 'x-pm-apiversion: 3' \
     --header 'Accept: application/vnd.protonmail.v1+json' \
     --timeout 20 -q -O /dev/stdout "https://api.protonmail.ch/vpn/logicals")
+  firewall_api close
   tier=$(cat ~/.protonvpn-cli/protonvpn_tier)
   output=`python <<END
 import json, random
